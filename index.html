@@ -38,189 +38,143 @@ body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;b
 <body>
 <div class="hdr">
 <div><h1>Oblt Cleaner</h1><div class="sub">Remove trackings com EVENT_103 sem EVENT_216</div></div>
-<div style="text-align:right"><div class="sub">v1.1 | Requer internet no 1o acesso</div></div>
+<div style="text-align:right"><div class="sub">v1.2</div></div>
 </div>
 <div class="container">
 <div id="errorMsg" class="hidden">
-<div class="error"><b>Erro:</b> Biblioteca SheetJS nao carregou. Abra esta pagina com internet pelo menos uma vez para cachear o script. Depois funciona offline.</div>
+<div class="error"><b>Erro:</b> Biblioteca nao carregou. Abra com internet pelo menos 1x.</div>
 </div>
 <div class="bx">
 <h3>1. Carregar arquivo</h3>
 <div class="drop-zone" id="dropZone">
 <p>&#128194; Arraste o arquivo .xlsx aqui ou clique para selecionar</p>
-<small>Formato esperado: Oblt com colunas tracking_id e status_event</small>
+<small>Formato: Oblt com colunas tracking_id e status_event</small>
 </div>
 <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
 </div>
 <div class="bx hidden" id="resultBox">
-<h3>2. Resultado da analise</h3>
+<h3>2. Resultado</h3>
 <div class="stats" id="stats"></div>
 <div class="note" id="noteRemoved"></div>
 <div class="actions">
-<button class="btn btn-success" onclick="downloadClean()">&#9989; Baixar Base Limpa (.xlsx)</button>
-<button class="btn btn-danger" onclick="downloadRemoved()">&#10060; Baixar Removidas (.xlsx)</button>
+<button class="btn btn-success" id="btnClean">&#9989; Baixar Base Limpa (.xlsx)</button>
+<button class="btn btn-danger" id="btnRemoved">&#10060; Baixar Removidas (.xlsx)</button>
 </div>
 <div id="log"></div>
 </div>
 </div>
 <script>
 (function(){
-if(typeof XLSX==='undefined'){
-document.getElementById('errorMsg').classList.remove('hidden');
-return;
-}
+"use strict";
+var ZERO=0;
+if(typeof XLSX==="undefined"){document.getElementById("errorMsg").classList.remove("hidden");return;}
 
-var cleanData=null,removedData=null,headers=null,fileName='';
-var dropZone=document.getElementById('dropZone');
-var fileInput=document.getElementById('fileInput');
+var cleanData,removedData,hdrs,fName;
+var dz=document.getElementById("dropZone");
+var fi=document.getElementById("fileInput");
 
-dropZone.addEventListener('click',function(){fileInput.click();});
-
-dropZone.addEventListener('dragover',function(e){
-e.preventDefault();e.stopPropagation();
-dropZone.classList.add('dragover');
-});
-
-dropZone.addEventListener('dragleave',function(e){
-e.preventDefault();e.stopPropagation();
-dropZone.classList.remove('dragover');
-});
-
-dropZone.addEventListener('drop',function(e){
-e.preventDefault();e.stopPropagation();
-dropZone.classList.remove('dragover');
-var files=e.dataTransfer.files;
-if(files&&files.length>0){readFile(files);}
-});
-
-fileInput.addEventListener('change',function(){
-var files=fileInput.files;
-if(files&&files.length>0){readFile(files);}
-});
-
-function readFile(file){
-fileName=file.name.replace(/\.[^.]+$/,'');
-var reader=new FileReader();
-reader.onload=function(e){processExcel(e.target.result);};
-reader.onerror=function(){alert('Erro ao ler o arquivo');};
-reader.readAsArrayBuffer(file);
-}
-
-function processExcel(data){
-try{
-var wb=XLSX.read(data,{type:'array'});
-var sheetName=wb.SheetNames;
-var ws=wb.Sheets[sheetName];
-var json=XLSX.utils.sheet_to_json(ws,{header:1});
-
-if(json.length<2){alert('Arquivo vazio ou sem dados');return;}
-
-headers=json;
-var rows=json.slice(1);
-
-var trackCol=-1;
-var eventCol=-1;
-for(var c=0;c<headers.length;c++){
-if(String(headers[c]).trim()==='tracking_id'){trackCol=c;}
-if(String(headers[c]).trim()==='status_event'){eventCol=c;}
-}
-
-if(trackCol===-1||eventCol===-1){
-alert('Colunas nao encontradas!
-Procurando: tracking_id e status_event
-Encontradas: '+headers.join(', '));
-return;
-}
-
-var trackEvents={};
-for(var i=0;i<rows.length;i++){
-var row=rows[i];
-var tid=row[trackCol];
-var evt=row[eventCol];
-if(!tid)continue;
-tid=String(tid).trim();
-if(!trackEvents[tid]){trackEvents[tid]={};}
-if(evt){trackEvents[tid][String(evt).trim()]=true;}
-}
-
-var toRemove={};
-var allTids=Object.keys(trackEvents);
-for(var i=0;i<allTids.length;i++){
-var tid=allTids[i];
-if(trackEvents[tid]['EVENT_103']&&!trackEvents[tid]['EVENT_216']){
-toRemove[tid]=true;
-}
-}
-
-cleanData=[];
-removedData=[];
-for(var i=0;i<rows.length;i++){
-var tid=rows[i][trackCol];
-if(tid&&toRemove[String(tid).trim()]){
-removedData.push(rows[i]);
-}else{
-cleanData.push(rows[i]);
-}
-}
-
-var totalTrackings=allTids.length;
-var removedCount=Object.keys(toRemove).length;
-var cleanTrackings=totalTrackings-removedCount;
-
-document.getElementById('stats').innerHTML=
-'<div class="stat-card"><div class="num">'+totalTrackings+'</div><div class="lbl">Trackings no arquivo</div></div>'+
-'<div class="stat-card removed"><div class="num">'+removedCount+'</div><div class="lbl">Trackings removidas</div></div>'+
-'<div class="stat-card removed"><div class="num">'+removedData.length+'</div><div class="lbl">Linhas removidas</div></div>'+
-'<div class="stat-card clean"><div class="num">'+cleanTrackings+'</div><div class="lbl">Trackings na base limpa</div></div>'+
-'<div class="stat-card clean"><div class="num">'+cleanData.length+'</div><div class="lbl">Linhas na base limpa</div></div>';
-
-var removedArr=Object.keys(toRemove).sort();
-document.getElementById('noteRemoved').innerHTML='<b>Trackings removidas (103 sem 216):</b><br>'+removedArr.join('<br>');
-
-var log='[OK] Arquivo: '+fileName+'
-';
-log+='[OK] '+rows.length+' linhas | '+totalTrackings+' trackings
-';
-log+='[>>] Buscando trackings com EVENT_103 sem EVENT_216...
-';
-log+='[!!] '+removedCount+' trackings encontradas ('+removedData.length+' linhas)
-';
-for(var i=0;i<removedArr.length;i++){log+='     - '+removedArr[i]+'
-';}
-log+='[OK] Base limpa: '+cleanData.length+' linhas | '+cleanTrackings+' trackings
-';
-log+='[OK] Pronto para download!';
-document.getElementById('log').textContent=log;
-
-document.getElementById('resultBox').classList.remove('hidden');
-dropZone.innerHTML='<p>&#9989; '+fileName+' carregado!</p><small>Clique para carregar outro arquivo</small>';
-
-}catch(err){
-alert('Erro ao processar arquivo:
-'+err.message);
-}
-}
-
-window.downloadClean=function(){
-if(!cleanData||!headers)return;
-var wb=XLSX.utils.book_new();
-var wsData=[headers].concat(cleanData);
-var ws=XLSX.utils.aoa_to_sheet(wsData);
-XLSX.utils.book_append_sheet(wb,ws,'Base_Limpa');
-XLSX.writeFile(wb,fileName+'_LIMPA.xlsx');
+dz.onclick=function(){fi.click();};
+dz.ondragover=function(e){e.preventDefault();dz.classList.add("dragover");};
+dz.ondragleave=function(e){e.preventDefault();dz.classList.remove("dragover");};
+dz.ondrop=function(e){
+  e.preventDefault();
+  dz.classList.remove("dragover");
+  var f=e.dataTransfer.files;
+  if(f.length>0) readF(f.item(ZERO));
 };
+fi.onchange=function(){if(fi.files.length>0) readF(fi.files.item(ZERO));};
 
-window.downloadRemoved=function(){
-if(!removedData||!headers)return;
-var wb=XLSX.utils.book_new();
-var wsData=[headers].concat(removedData);
-var ws=XLSX.utils.aoa_to_sheet(wsData);
-XLSX.utils.book_append_sheet(wb,ws,'Removidas');
-XLSX.writeFile(wb,fileName+'_REMOVIDAS.xlsx');
-};
+document.getElementById("btnClean").onclick=function(){dlFile(cleanData,"_LIMPA");};
+document.getElementById("btnRemoved").onclick=function(){dlFile(removedData,"_REMOVIDAS");};
+
+function readF(file){
+  fName=file.name.replace(/\.[^.]+$/,"");
+  var r=new FileReader();
+  r.onload=function(ev){run(ev.target.result);};
+  r.readAsArrayBuffer(file);
+}
+
+function run(buf){
+  try{
+    var wb=XLSX.read(buf,{type:"array"});
+    var sn=wb.SheetNames;
+    var ws=wb.Sheets[sn[ZERO]];
+    var all=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+    if(all.length<2){alert("Arquivo vazio");return;}
+
+    hdrs=all[ZERO];
+    var rows=all.slice(1);
+
+    var tCol=-1,eCol=-1;
+    for(var i=0;i<hdrs.length;i++){
+      var h=String(hdrs[i]).trim().toLowerCase();
+      if(h==="tracking_id") tCol=i;
+      if(h==="status_event") eCol=i;
+    }
+    if(tCol<0||eCol<0){alert("Colunas tracking_id / status_event nao encontradas.
+Colunas: "+hdrs.join(", "));return;}
+
+    var map={};
+    for(var i=0;i<rows.length;i++){
+      var tid=String(rows[i][tCol]||"").trim();
+      var evt=String(rows[i][eCol]||"").trim();
+      if(!tid) continue;
+      if(!map[tid]) map[tid]={};
+      map[tid][evt]=1;
+    }
+
+    var kill={};
+    var keys=Object.keys(map);
+    for(var i=0;i<keys.length;i++){
+      if(map[keys[i]]["EVENT_103"] && !map[keys[i]]["EVENT_216"]) kill[keys[i]]=1;
+    }
+
+    cleanData=[];removedData=[];
+    for(var i=0;i<rows.length;i++){
+      var tid=String(rows[i][tCol]||"").trim();
+      if(kill[tid]) removedData.push(rows[i]);
+      else cleanData.push(rows[i]);
+    }
+
+    var tot=keys.length, rem=Object.keys(kill).length, limpo=tot-rem;
+
+    document.getElementById("stats").innerHTML=
+      card(tot,"Trackings total","")+
+      card(rem,"Removidas","removed")+
+      card(removedData.length,"Linhas removidas","removed")+
+      card(limpo,"Trackings limpa","clean")+
+      card(cleanData.length,"Linhas limpa","clean");
+
+    var arr=Object.keys(kill).sort();
+    document.getElementById("noteRemoved").innerHTML="<b>Removidas (103 sem 216):</b><br>"+arr.join("<br>");
+
+    var log="[OK] "+fName+" | "+rows.length+" linhas | "+tot+" trackings
+";
+    log+="[>>] Filtrando 103 sem 216...
+";
+    log+="[!!] "+rem+" trackings ("+removedData.length+" linhas) removidas
+";
+    for(var i=0;i<arr.length;i++) log+="     "+arr[i]+"
+";
+    log+="[OK] Base limpa: "+cleanData.length+" linhas | "+limpo+" trackings";
+    document.getElementById("log").textContent=log;
+
+    document.getElementById("resultBox").classList.remove("hidden");
+    dz.innerHTML="<p>&#9989; "+fName+" processado!</p><small>Clique para outro arquivo</small>";
+  }catch(er){alert("Erro: "+er.message);}
+}
+
+function card(n,lbl,cls){return '<div class="stat-card '+cls+'"><div class="num">'+n+'</div><div class="lbl">'+lbl+'</div></div>';}
+
+function dlFile(data,suffix){
+  if(!data||!hdrs) return;
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.aoa_to_sheet([hdrs].concat(data));
+  XLSX.utils.book_append_sheet(wb,ws,"Dados");
+  XLSX.writeFile(wb,fName+suffix+".xlsx");
+}
 
 })();
 </script>
 </body>
 </html>
-
