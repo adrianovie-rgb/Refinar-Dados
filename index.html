@@ -1,176 +1,316 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Oblt Cleaner - Remove 103 sem 216</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f8f9fa;color:#1d2d35;min-height:100vh}
-.hdr{background:linear-gradient(135deg,#232f3e 0%,#37475a 100%);color:#fff;padding:18px 32px;display:flex;align-items:center;justify-content:space-between}
-.hdr h1{font-size:20px;font-weight:700}
-.hdr .sub{font-size:12px;opacity:0.8}
-.container{max-width:1000px;margin:0 auto;padding:24px 32px}
-.bx{background:#fff;border-radius:12px;padding:24px;margin-bottom:20px;box-shadow:0 2px 8px rgba(0,0,0,0.06)}
-.bx h3{font-size:16px;font-weight:700;color:#232f3e;margin-bottom:12px}
-.drop-zone{border:3px dashed #adb5bd;border-radius:12px;padding:60px 20px;text-align:center;cursor:pointer;transition:all .3s;background:#f8f9fa}
-.drop-zone:hover,.drop-zone.dragover{border-color:#ff9900;background:#fff7ed}
-.drop-zone p{font-size:16px;color:#666;margin-bottom:8px}
-.drop-zone small{font-size:12px;color:#999}
-.btn{display:inline-block;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;border:none;transition:all .2s}
-.btn-success{background:#27ae60;color:#fff}.btn-success:hover{background:#1e8449}
-.btn-danger{background:#e74c3c;color:#fff}.btn-danger:hover{background:#c0392b}
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin:16px 0}
-.stat-card{background:#f8f9fa;border-radius:8px;padding:16px;text-align:center;border:1px solid #e9ecef}
-.stat-card .num{font-size:28px;font-weight:800;color:#232f3e}
-.stat-card .lbl{font-size:11px;color:#666;margin-top:4px}
-.stat-card.removed .num{color:#e74c3c}
-.stat-card.clean .num{color:#27ae60}
-.hidden{display:none}
-.actions{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap}
-.note{background:#fff7ed;border-left:4px solid #f97316;padding:10px 14px;margin:12px 0;font-size:12px;color:#9a3412;border-radius:0 6px 6px 0}
-.error{background:#fee2e2;border-left:4px solid #e74c3c;padding:14px;margin:12px 0;font-size:13px;color:#991b1b;border-radius:0 6px 6px 0}
-#log{background:#1a1a2e;color:#0f0;font-family:monospace;font-size:11px;padding:12px;border-radius:8px;max-height:200px;overflow-y:auto;margin-top:12px;white-space:pre-wrap}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Oblt Cleaner</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .header { text-align: center; margin-bottom: 30px; }
+        .header h1 { font-size: 2em; color: #00d4ff; margin-bottom: 5px; }
+        .header p { color: #888; font-size: 0.85em; }
+        .rules-info { background: #16213e; border: 1px solid #0f3460; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px; max-width: 600px; width: 100%; }
+        .rules-info h3 { color: #00d4ff; font-size: 0.9em; margin-bottom: 8px; }
+        .rules-info ul { list-style: none; padding: 0; }
+        .rules-info li { padding: 4px 0; font-size: 0.82em; color: #ccc; }
+        .rules-info li::before { content: "⚡"; margin-right: 6px; }
+        .container { background: #16213e; border-radius: 12px; padding: 30px; max-width: 600px; width: 100%; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .section { margin-bottom: 25px; }
+        .section-title { font-size: 1em; color: #00d4ff; margin-bottom: 12px; font-weight: 600; }
+        .drop-zone { border: 2px dashed #0f3460; border-radius: 8px; padding: 40px 20px; text-align: center; cursor: pointer; transition: all 0.3s; }
+        .drop-zone:hover, .drop-zone.dragover { border-color: #00d4ff; background: rgba(0,212,255,0.05); }
+        .drop-zone p { color: #888; margin-top: 8px; font-size: 0.8em; }
+        .drop-zone .icon { font-size: 2em; }
+        #fileInput { display: none; }
+        .results { display: none; }
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+        .stat-box { background: #0f3460; border-radius: 8px; padding: 12px; text-align: center; }
+        .stat-box .value { font-size: 1.5em; font-weight: bold; color: #00d4ff; }
+        .stat-box .label { font-size: 0.75em; color: #888; margin-top: 4px; }
+        .stat-box.removed .value { color: #ff6b6b; }
+        .stat-box.rule1 .value { color: #ffa500; }
+        .stat-box.rule2 .value { color: #ff69b4; }
+        .btn { display: inline-block; padding: 12px 24px; border: none; border-radius: 8px; font-size: 0.9em; cursor: pointer; transition: all 0.3s; text-decoration: none; margin: 5px; width: calc(50% - 15px); }
+        .btn-clean { background: #00b894; color: #fff; }
+        .btn-clean:hover { background: #00a381; }
+        .btn-removed { background: #d63031; color: #fff; }
+        .btn-removed:hover { background: #b71c1c; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .buttons { text-align: center; }
+        .loading { display: none; text-align: center; padding: 20px; }
+        .loading .spinner { border: 3px solid #0f3460; border-top: 3px solid #00d4ff; border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; margin: 0 auto 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error { display: none; background: #d63031; color: #fff; padding: 12px; border-radius: 8px; margin-bottom: 15px; font-size: 0.85em; }
+        .version { color: #555; font-size: 0.7em; margin-top: 20px; text-align: center; }
+    </style>
 </head>
 <body>
-<div class="hdr">
-<div><h1>Oblt Cleaner</h1><div class="sub">Remove trackings com EVENT_103 sem EVENT_216</div></div>
-<div style="text-align:right"><div class="sub">v1.3 | Requer internet no 1o acesso</div></div>
-</div>
-<div class="container">
-<div id="errorMsg" class="hidden">
-<div class="error"><b>Erro:</b> Biblioteca SheetJS nao carregou. Abra esta pagina com internet pelo menos uma vez.</div>
-</div>
-<div class="bx">
-<h3>1. Carregar arquivo</h3>
-<div class="drop-zone" id="dropZone">
-<p>&#128194; Arraste o arquivo .xlsx aqui ou clique para selecionar</p>
-<small>Formato: Oblt com colunas tracking_id e status_event</small>
-</div>
-<input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none">
-</div>
-<div class="bx hidden" id="resultBox">
-<h3>2. Resultado da analise</h3>
-<div class="stats" id="stats"></div>
-<div class="note" id="noteRemoved"></div>
-<div class="actions">
-<button class="btn btn-success" id="btnClean">&#9989; Baixar Base Limpa (.xlsx)</button>
-<button class="btn btn-danger" id="btnRemoved">&#10060; Baixar Removidas (.xlsx)</button>
-</div>
-<div id="log"></div>
-</div>
-</div>
-<script>
-(function(){
-"use strict";
-if(typeof XLSX==="undefined"){
-  document.getElementById("errorMsg").classList.remove("hidden");
-  return;
-}
-var cleanData=null,removedData=null,hdrs=null,fName="";
-var dz=document.getElementById("dropZone");
-var fi=document.getElementById("fileInput");
-dz.onclick=function(){fi.click();};
-dz.ondragover=function(e){e.preventDefault();dz.classList.add("dragover");};
-dz.ondragleave=function(e){e.preventDefault();dz.classList.remove("dragover");};
-dz.ondrop=function(e){
-  e.preventDefault();
-  dz.classList.remove("dragover");
-  var files=e.dataTransfer.files;
-  if(files&&files.length>0){readFile(files[0]);}
-};
-fi.onchange=function(){
-  if(fi.files&&fi.files.length>0){readFile(fi.files[0]);}
-};
-document.getElementById("btnClean").onclick=function(){dlFile(cleanData,"_LIMPA");};
-document.getElementById("btnRemoved").onclick=function(){dlFile(removedData,"_REMOVIDAS");};
-function readFile(file){
-  fName=file.name.replace(/\.[^.]+$/,"");
-  var reader=new FileReader();
-  reader.onload=function(ev){processExcel(ev.target.result);};
-  reader.onerror=function(){alert("Erro ao ler o arquivo");};
-  reader.readAsArrayBuffer(file);
-}
-function processExcel(buf){
-  try{
-    var wb=XLSX.read(buf,{type:"array"});
-    var firstSheetName=wb.SheetNames[0];
-    var ws=wb.Sheets[firstSheetName];
-    var all=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
-    if(all.length<2){alert("Arquivo vazio ou sem dados");return;}
-    hdrs=all[0];
-    var rows=all.slice(1);
-    var tCol=-1,eCol=-1;
-    for(var i=0;i<hdrs.length;i++){
-      var h=String(hdrs[i]).trim().toLowerCase();
-      if(h==="tracking_id"){tCol=i;}
-      if(h==="status_event"){eCol=i;}
-    }
-    if(tCol<0||eCol<0){
-      alert("Colunas nao encontradas!\nProcurando: tracking_id e status_event\nColunas: "+hdrs.join(", "));
-      return;
-    }
-    var trackMap={};
-    for(var i=0;i<rows.length;i++){
-      var tid=String(rows[i][tCol]||"").trim();
-      var evt=String(rows[i][eCol]||"").trim();
-      if(!tid){continue;}
-      if(!trackMap[tid]){trackMap[tid]={};}
-      trackMap[tid][evt]=1;
-    }
-    var killSet={};
-    var allKeys=Object.keys(trackMap);
-    for(var i=0;i<allKeys.length;i++){
-      var key=allKeys[i];
-      if(trackMap[key]["EVENT_103"]&&!trackMap[key]["EVENT_216"]){killSet[key]=1;}
-    }
-    cleanData=[];
-    removedData=[];
-    for(var i=0;i<rows.length;i++){
-      var rowTid=String(rows[i][tCol]||"").trim();
-      if(killSet[rowTid]){removedData.push(rows[i]);}
-      else{cleanData.push(rows[i]);}
-    }
-    var totalTracks=allKeys.length;
-    var removedCount=Object.keys(killSet).length;
-    var cleanTracks=totalTracks-removedCount;
-    document.getElementById("stats").innerHTML=
-      mkCard(totalTracks,"Trackings no arquivo","")+
-      mkCard(removedCount,"Trackings removidas","removed")+
-      mkCard(removedData.length,"Linhas removidas","removed")+
-      mkCard(cleanTracks,"Trackings na base limpa","clean")+
-      mkCard(cleanData.length,"Linhas na base limpa","clean");
-    var removedArr=Object.keys(killSet).sort();
-    document.getElementById("noteRemoved").innerHTML=
-      "<b>Trackings removidas (EVENT_103 sem EVENT_216):</b><br>"+removedArr.join("<br>");
-    var logTxt="[OK] Arquivo: "+fName+"\n";
-    logTxt+="[OK] "+rows.length+" linhas | "+totalTracks+" trackings\n";
-    logTxt+="[>>] Buscando trackings com EVENT_103 sem EVENT_216...\n";
-    logTxt+="[!!] "+removedCount+" trackings encontradas ("+removedData.length+" linhas)\n";
-    for(var i=0;i<removedArr.length;i++){logTxt+="     - "+removedArr[i]+"\n";}
-    logTxt+="[OK] Base limpa: "+cleanData.length+" linhas | "+cleanTracks+" trackings\n";
-    logTxt+="[OK] Pronto para download!";
-    document.getElementById("log").textContent=logTxt;
-    document.getElementById("resultBox").classList.remove("hidden");
-    dz.innerHTML="<p>&#9989; "+fName+" processado com sucesso!</p><small>Clique aqui para carregar outro arquivo</small>";
-  }catch(err){
-    alert("Erro ao processar:\n"+err.message);
-  }
-}
-function mkCard(n,lbl,cls){
-  return '<div class="stat-card '+cls+'"><div class="num">'+n+'</div><div class="lbl">'+lbl+'</div></div>';
-}
-function dlFile(data,suffix){
-  if(!data||!hdrs){alert("Nenhum dado para exportar.");return;}
-  var wb=XLSX.utils.book_new();
-  var wsData=[hdrs].concat(data);
-  var ws=XLSX.utils.aoa_to_sheet(wsData);
-  XLSX.utils.book_append_sheet(wb,ws,"Dados");
-  XLSX.writeFile(wb,fName+suffix+".xlsx");
-}
-})();
-</script>
+    <div class="header">
+        <h1>Oblt Cleaner</h1>
+        <p>Limpeza de trackings por regras de eventos</p>
+    </div>
+
+    <div class="rules-info">
+        <h3>Regras aplicadas:</h3>
+        <ul>
+            <li>Regra 1: Remove trackings com EVENT_103 sem EVENT_216</li>
+            <li>Regra 2: Remove trackings com EVENT_201 na mesma data do EVENT_103</li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <div class="error" id="errorMsg">Erro: Biblioteca SheetJS nao carregou. Abra esta pagina com internet pelo menos uma vez.</div>
+
+        <div class="section">
+            <div class="section-title">1. Carregar arquivo</div>
+            <div class="drop-zone" id="dropZone">
+                <div class="icon">📂</div>
+                Arraste o arquivo .xlsx aqui ou clique para selecionar
+                <p>Formato: Oblt com colunas tracking_id, status_event e status_date</p>
+            </div>
+            <input type="file" id="fileInput" accept=".xlsx">
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processando arquivo...</p>
+        </div>
+
+        <div class="section results" id="results">
+            <div class="section-title">2. Resultado da analise</div>
+            <div class="stat-grid">
+                <div class="stat-box"><div class="value" id="totalTrackings">0</div><div class="label">Total trackings</div></div>
+                <div class="stat-box removed"><div class="value" id="removedTrackings">0</div><div class="label">Removidas (total)</div></div>
+                <div class="stat-box rule1"><div class="value" id="rule1Trackings">0</div><div class="label">Regra 1 (103 s/ 216)</div></div>
+                <div class="stat-box rule2"><div class="value" id="rule2Trackings">0</div><div class="label">Regra 2 (201=103 data)</div></div>
+            </div>
+            <div class="buttons">
+                <button class="btn btn-clean" id="btnClean" onclick="downloadClean()">✅ Baixar Base Limpa (.xlsx)</button>
+                <button class="btn btn-removed" id="btnRemoved" onclick="downloadRemoved()">❌ Baixar Removidas (.xlsx)</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="version">v1.4 | Requer internet no 1o acesso</div>
+
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    <script>
+        let cleanData = [];
+        let removedData = [];
+        let headers = [];
+
+        // Check if XLSX loaded
+        window.addEventListener('load', () => {
+            if (typeof XLSX === 'undefined') {
+                document.getElementById('errorMsg').style.display = 'block';
+            }
+        });
+
+        // Drop zone events
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('dragover'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]);
+        });
+        fileInput.addEventListener('change', (e) => { if (e.target.files.length) processFile(e.target.files[0]); });
+
+        function normalizeDate(val) {
+            if (!val) return '';
+            // If it's a number (Excel serial date), convert it
+            if (typeof val === 'number') {
+                const date = XLSX.SSF.parse_date_code(val);
+                if (date) {
+                    const y = date.y;
+                    const m = String(date.m).padStart(2, '0');
+                    const d = String(date.d).padStart(2, '0');
+                    return `${y}-${m}-${d}`;
+                }
+            }
+            // If it's a string, extract just the date part (YYYY-MM-DD or DD/MM/YYYY etc)
+            const str = String(val).trim();
+            // Try YYYY-MM-DD format
+            const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (isoMatch) return isoMatch[0];
+            // Try DD/MM/YYYY format
+            const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+            if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+            // Try MM/DD/YYYY format
+            const usMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+            if (usMatch) return `${usMatch[3]}-${usMatch[1]}-${usMatch[2]}`;
+            // Return first 10 chars as fallback
+            return str.substring(0, 10);
+        }
+
+        function processFile(file) {
+            if (!file.name.endsWith('.xlsx')) {
+                alert('Por favor, selecione um arquivo .xlsx');
+                return;
+            }
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('results').style.display = 'none';
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const workbook = XLSX.read(e.target.result, { type: 'array', cellDates: false });
+                    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                    const data = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true });
+
+                    if (data.length < 2) throw new Error('Arquivo vazio');
+
+                    headers = data[0];
+                    const rows = data.slice(1);
+
+                    // Find column indexes
+                    const trackingIdx = headers.findIndex(h => String(h).toLowerCase().includes('tracking_id'));
+                    const eventIdx = headers.findIndex(h => String(h).toLowerCase().includes('status_event'));
+                    const dateIdx = headers.findIndex(h => String(h).toLowerCase().includes('status_date'));
+
+                    if (trackingIdx === -1 || eventIdx === -1) throw new Error('Colunas tracking_id e/ou status_event nao encontradas');
+                    if (dateIdx === -1) throw new Error('Coluna status_date nao encontrada (necessaria para Regra 2)');
+
+                    // Group rows by tracking_id
+                    const groups = {};
+                    rows.forEach(row => {
+                        if (!row || row.length === 0) return;
+                        const tid = String(row[trackingIdx] || '').trim();
+                        if (!tid) return;
+                        if (!groups[tid]) groups[tid] = [];
+                        groups[tid].push(row);
+                    });
+
+                    cleanData = [];
+                    removedData = [];
+                    let rule1Count = 0;
+                    let rule2Count = 0;
+
+                    const totalTrackings = Object.keys(groups).length;
+
+                    Object.entries(groups).forEach(([tid, tRows]) => {
+                        const events = tRows.map(r => String(r[eventIdx] || '').trim().toUpperCase());
+
+                        let removed = false;
+                        let appliedRule = 0;
+
+                        // Rule 1: Has EVENT_103 but no EVENT_216
+                        const has103 = events.some(ev => ev === 'EVENT_103');
+                        const has216 = events.some(ev => ev === 'EVENT_216');
+
+                        if (has103 && !has216) {
+                            removed = true;
+                            appliedRule = 1;
+                        }
+
+                        // Rule 2: EVENT_201 on same date as EVENT_103
+                        if (!removed && has103) {
+                            // Get dates for EVENT_103
+                            const dates103 = [];
+                            tRows.forEach(r => {
+                                if (String(r[eventIdx] || '').trim().toUpperCase() === 'EVENT_103') {
+                                    dates103.push(normalizeDate(r[dateIdx]));
+                                }
+                            });
+
+                            // Check if any EVENT_201 has same date as any EVENT_103
+                            const has201SameDate = tRows.some(r => {
+                                if (String(r[eventIdx] || '').trim().toUpperCase() === 'EVENT_201') {
+                                    const date201 = normalizeDate(r[dateIdx]);
+                                    return dates103.includes(date201);
+                                }
+                                return false;
+                            });
+
+                            if (has201SameDate) {
+                                removed = true;
+                                appliedRule = 2;
+                            }
+                        }
+
+                        if (removed) {
+                            removedData.push(...tRows);
+                            if (appliedRule === 1) rule1Count++;
+                            if (appliedRule === 2) rule2Count++;
+                        } else {
+                            cleanData.push(...tRows);
+                        }
+                    });
+
+                    // Update UI
+                    document.getElementById('totalTrackings').textContent = totalTrackings.toLocaleString('pt-BR');
+                    document.getElementById('removedTrackings').textContent = (rule1Count + rule2Count).toLocaleString('pt-BR');
+                    document.getElementById('rule1Trackings').textContent = rule1Count.toLocaleString('pt-BR');
+                    document.getElementById('rule2Trackings').textContent = rule2Count.toLocaleString('pt-BR');
+
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('results').style.display = 'block';
+
+                } catch (err) {
+                    document.getElementById('loading').style.display = 'none';
+                    alert('Erro: ' + err.message);
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function downloadClean() {
+            if (!cleanData.length) return;
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...cleanData]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Base Limpa');
+            XLSX.utils.book_append_sheet(wb, createSummarySheet(), 'Resumo');
+            XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/octet-stream' });
+            downloadBlob(blob, 'base_limpa.xlsx');
+        }
+
+        function downloadRemoved() {
+            if (!removedData.length) return;
+            const ws = XLSX.utils.aoa_to_sheet([headers, ...removedData]);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, 'Removidas');
+            XLSX.utils.book_append_sheet(wb, createSummarySheet(), 'Resumo');
+            XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+            const blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/octet-stream' });
+            downloadBlob(blob, 'removidas.xlsx');
+        }
+
+        function createSummarySheet() {
+            const summaryData = [
+                ['Oblt Cleaner - Resumo'],
+                [''],
+                ['Regra', 'Descricao'],
+                ['Regra 1', 'Trackings com EVENT_103 sem EVENT_216'],
+                ['Regra 2', 'Trackings com EVENT_201 na mesma data do EVENT_103'],
+                [''],
+                ['Metrica', 'Valor'],
+                ['Total trackings', document.getElementById('totalTrackings').textContent],
+                ['Removidas (total)', document.getElementById('removedTrackings').textContent],
+                ['Regra 1', document.getElementById('rule1Trackings').textContent],
+                ['Regra 2', document.getElementById('rule2Trackings').textContent],
+            ];
+            return XLSX.utils.aoa_to_sheet(summaryData);
+        }
+
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
 </body>
 </html>
+
