@@ -32,6 +32,7 @@
         .stat-box.removed .value { color: #ff6b6b; }
         .stat-box.rule1 .value { color: #ffa500; }
         .stat-box.rule2 .value { color: #ff69b4; }
+        .stat-box.rule3 .value { color: #a29bfe; }
         .btn { display: inline-block; padding: 12px 24px; border: none; border-radius: 8px; font-size: 0.9em; cursor: pointer; transition: all 0.3s; text-decoration: none; margin: 5px; width: calc(50% - 15px); }
         .btn-clean { background: #00b894; color: #fff; }
         .btn-clean:hover { background: #00a381; }
@@ -56,7 +57,8 @@
         <h3>Regras aplicadas:</h3>
         <ul>
             <li>Regra 1: Remove trackings com EVENT_103 sem EVENT_216</li>
-            <li>Regra 2: Remove trackings com EVENT_201 na mesma data do EVENT_103</li>
+            <li>Regra 2: Remove trackings com EVENT_201 em data diferente do EVENT_103</li>
+            <li>Regra 3: Remove trackings com EVENT_216 em data diferente do EVENT_103</li>
         </ul>
     </div>
 
@@ -84,7 +86,8 @@
                 <div class="stat-box"><div class="value" id="totalTrackings">0</div><div class="label">Total trackings</div></div>
                 <div class="stat-box removed"><div class="value" id="removedTrackings">0</div><div class="label">Removidas (total)</div></div>
                 <div class="stat-box rule1"><div class="value" id="rule1Trackings">0</div><div class="label">Regra 1 (103 s/ 216)</div></div>
-                <div class="stat-box rule2"><div class="value" id="rule2Trackings">0</div><div class="label">Regra 2 (201=103 data)</div></div>
+                <div class="stat-box rule2"><div class="value" id="rule2Trackings">0</div><div class="label">Regra 2 (201 data ≠ 103)</div></div>
+                <div class="stat-box rule3"><div class="value" id="rule3Trackings">0</div><div class="label">Regra 3 (216 data ≠ 103)</div></div>
             </div>
             <div class="buttons">
                 <button class="btn btn-clean" id="btnClean" onclick="downloadClean()">✅ Baixar Base Limpa (.xlsx)</button>
@@ -93,7 +96,7 @@
         </div>
     </div>
 
-    <div class="version">v1.4 | Requer internet no 1o acesso</div>
+    <div class="version">v1.5 | Requer internet no 1o acesso</div>
 
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <script>
@@ -142,9 +145,6 @@
             // Try DD/MM/YYYY format
             const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
             if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
-            // Try MM/DD/YYYY format
-            const usMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-            if (usMatch) return `${usMatch[3]}-${usMatch[1]}-${usMatch[2]}`;
             // Return first 10 chars as fallback
             return str.substring(0, 10);
         }
@@ -176,7 +176,7 @@
                     const dateIdx = headers.findIndex(h => String(h).toLowerCase().includes('status_date'));
 
                     if (trackingIdx === -1 || eventIdx === -1) throw new Error('Colunas tracking_id e/ou status_event nao encontradas');
-                    if (dateIdx === -1) throw new Error('Coluna status_date nao encontrada (necessaria para Regra 2)');
+                    if (dateIdx === -1) throw new Error('Coluna status_date nao encontrada (necessaria para Regras 2 e 3)');
 
                     // Group rows by tracking_id
                     const groups = {};
@@ -192,6 +192,7 @@
                     removedData = [];
                     let rule1Count = 0;
                     let rule2Count = 0;
+                    let rule3Count = 0;
 
                     const totalTrackings = Object.keys(groups).length;
 
@@ -210,7 +211,7 @@
                             appliedRule = 1;
                         }
 
-                        // Rule 2: EVENT_201 on same date as EVENT_103
+                        // Rule 2: EVENT_201 on DIFFERENT date than EVENT_103
                         if (!removed && has103) {
                             // Get dates for EVENT_103
                             const dates103 = [];
@@ -220,18 +221,43 @@
                                 }
                             });
 
-                            // Check if any EVENT_201 has same date as any EVENT_103
-                            const has201SameDate = tRows.some(r => {
+                            // Check if any EVENT_201 has DIFFERENT date than all EVENT_103
+                            const has201DiffDate = tRows.some(r => {
                                 if (String(r[eventIdx] || '').trim().toUpperCase() === 'EVENT_201') {
                                     const date201 = normalizeDate(r[dateIdx]);
-                                    return dates103.includes(date201);
+                                    return !dates103.includes(date201);
                                 }
                                 return false;
                             });
 
-                            if (has201SameDate) {
+                            if (has201DiffDate) {
                                 removed = true;
                                 appliedRule = 2;
+                            }
+                        }
+
+                        // Rule 3: EVENT_216 on DIFFERENT date than EVENT_103
+                        if (!removed && has103 && has216) {
+                            // Get dates for EVENT_103
+                            const dates103 = [];
+                            tRows.forEach(r => {
+                                if (String(r[eventIdx] || '').trim().toUpperCase() === 'EVENT_103') {
+                                    dates103.push(normalizeDate(r[dateIdx]));
+                                }
+                            });
+
+                            // Check if any EVENT_216 has DIFFERENT date than all EVENT_103
+                            const has216DiffDate = tRows.some(r => {
+                                if (String(r[eventIdx] || '').trim().toUpperCase() === 'EVENT_216') {
+                                    const date216 = normalizeDate(r[dateIdx]);
+                                    return !dates103.includes(date216);
+                                }
+                                return false;
+                            });
+
+                            if (has216DiffDate) {
+                                removed = true;
+                                appliedRule = 3;
                             }
                         }
 
@@ -239,6 +265,7 @@
                             removedData.push(...tRows);
                             if (appliedRule === 1) rule1Count++;
                             if (appliedRule === 2) rule2Count++;
+                            if (appliedRule === 3) rule3Count++;
                         } else {
                             cleanData.push(...tRows);
                         }
@@ -246,9 +273,10 @@
 
                     // Update UI
                     document.getElementById('totalTrackings').textContent = totalTrackings.toLocaleString('pt-BR');
-                    document.getElementById('removedTrackings').textContent = (rule1Count + rule2Count).toLocaleString('pt-BR');
+                    document.getElementById('removedTrackings').textContent = (rule1Count + rule2Count + rule3Count).toLocaleString('pt-BR');
                     document.getElementById('rule1Trackings').textContent = rule1Count.toLocaleString('pt-BR');
                     document.getElementById('rule2Trackings').textContent = rule2Count.toLocaleString('pt-BR');
+                    document.getElementById('rule3Trackings').textContent = rule3Count.toLocaleString('pt-BR');
 
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('results').style.display = 'block';
@@ -267,7 +295,6 @@
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Base Limpa');
             XLSX.utils.book_append_sheet(wb, createSummarySheet(), 'Resumo');
-            XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
             const blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/octet-stream' });
             downloadBlob(blob, 'base_limpa.xlsx');
         }
@@ -278,7 +305,6 @@
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Removidas');
             XLSX.utils.book_append_sheet(wb, createSummarySheet(), 'Resumo');
-            XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
             const blob = new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })], { type: 'application/octet-stream' });
             downloadBlob(blob, 'removidas.xlsx');
         }
@@ -289,13 +315,15 @@
                 [''],
                 ['Regra', 'Descricao'],
                 ['Regra 1', 'Trackings com EVENT_103 sem EVENT_216'],
-                ['Regra 2', 'Trackings com EVENT_201 na mesma data do EVENT_103'],
+                ['Regra 2', 'Trackings com EVENT_201 em data diferente do EVENT_103'],
+                ['Regra 3', 'Trackings com EVENT_216 em data diferente do EVENT_103'],
                 [''],
                 ['Metrica', 'Valor'],
                 ['Total trackings', document.getElementById('totalTrackings').textContent],
                 ['Removidas (total)', document.getElementById('removedTrackings').textContent],
                 ['Regra 1', document.getElementById('rule1Trackings').textContent],
                 ['Regra 2', document.getElementById('rule2Trackings').textContent],
+                ['Regra 3', document.getElementById('rule3Trackings').textContent],
             ];
             return XLSX.utils.aoa_to_sheet(summaryData);
         }
