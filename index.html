@@ -57,8 +57,8 @@
         <h3>Regras aplicadas:</h3>
         <ul>
             <li>Regra 1: Remove trackings com EVENT_103 sem EVENT_216</li>
-            <li>Regra 2: Remove trackings com EVENT_201 em data diferente do EVENT_103</li>
-            <li>Regra 3: Remove trackings com EVENT_216 em data diferente do EVENT_103</li>
+            <li>Regra 2: Remove trackings com EVENT_201 em data diferente do EVENT_103 (nenhum 201 coincide)</li>
+            <li>Regra 3: Remove trackings com EVENT_216 em data diferente do EVENT_103 (nenhum 216 coincide)</li>
         </ul>
     </div>
 
@@ -96,7 +96,7 @@
         </div>
     </div>
 
-    <div class="version">v1.5 | Requer internet no 1o acesso</div>
+    <div class="version">v1.6 | Correcao logica Regras 2/3 | Requer internet no 1o acesso</div>
 
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
     <script>
@@ -126,7 +126,7 @@
         fileInput.addEventListener('change', (e) => { if (e.target.files.length) processFile(e.target.files[0]); });
 
         function normalizeDate(val) {
-            if (!val) return '';
+            if (!val && val !== 0) return '';
             // If it's a number (Excel serial date), convert it
             if (typeof val === 'number') {
                 const date = XLSX.SSF.parse_date_code(val);
@@ -137,7 +137,7 @@
                     return `${y}-${m}-${d}`;
                 }
             }
-            // If it's a string, extract just the date part (YYYY-MM-DD or DD/MM/YYYY etc)
+            // If it's a string, extract just the date part
             const str = String(val).trim();
             // Try YYYY-MM-DD format
             const isoMatch = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -145,6 +145,9 @@
             // Try DD/MM/YYYY format
             const brMatch = str.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
             if (brMatch) return `${brMatch[3]}-${brMatch[2]}-${brMatch[1]}`;
+            // Try MM/DD/YYYY format (US)
+            const usMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+            if (usMatch) return `${usMatch[3]}-${String(usMatch[1]).padStart(2,'0')}-${String(usMatch[2]).padStart(2,'0')}`;
             // Return first 10 chars as fallback
             return str.substring(0, 10);
         }
@@ -202,18 +205,19 @@
                         let removed = false;
                         let appliedRule = 0;
 
-                        // Rule 1: Has EVENT_103 but no EVENT_216
                         const has103 = events.some(ev => ev === 'EVENT_103');
                         const has216 = events.some(ev => ev === 'EVENT_216');
+                        const has201 = events.some(ev => ev === 'EVENT_201');
 
+                        // Rule 1: Has EVENT_103 but NO EVENT_216 at all
                         if (has103 && !has216) {
                             removed = true;
                             appliedRule = 1;
                         }
 
-                        // Rule 2: EVENT_201 on DIFFERENT date than EVENT_103
-                        if (!removed && has103) {
-                            // Get dates for EVENT_103
+                        // Rule 2: Has EVENT_201 but NONE of the 201 dates match ANY 103 date
+                        if (!removed && has103 && has201) {
+                            // Get all dates for EVENT_103
                             const dates103 = [];
                             tRows.forEach(r => {
                                 if (String(r[eventIdx] || '').trim().toUpperCase() === 'EVENT_103') {
@@ -221,24 +225,25 @@
                                 }
                             });
 
-                            // Check if any EVENT_201 has DIFFERENT date than all EVENT_103
-                            const has201DiffDate = tRows.some(r => {
+                            // Check if AT LEAST ONE EVENT_201 has the SAME date as any EVENT_103
+                            const any201SameDate = tRows.some(r => {
                                 if (String(r[eventIdx] || '').trim().toUpperCase() === 'EVENT_201') {
                                     const date201 = normalizeDate(r[dateIdx]);
-                                    return !dates103.includes(date201);
+                                    return dates103.includes(date201);
                                 }
                                 return false;
                             });
 
-                            if (has201DiffDate) {
+                            // Remove only if NO EVENT_201 matches any EVENT_103 date
+                            if (!any201SameDate) {
                                 removed = true;
                                 appliedRule = 2;
                             }
                         }
 
-                        // Rule 3: EVENT_216 on DIFFERENT date than EVENT_103
+                        // Rule 3: Has EVENT_216 but NONE of the 216 dates match ANY 103 date
                         if (!removed && has103 && has216) {
-                            // Get dates for EVENT_103
+                            // Get all dates for EVENT_103
                             const dates103 = [];
                             tRows.forEach(r => {
                                 if (String(r[eventIdx] || '').trim().toUpperCase() === 'EVENT_103') {
@@ -246,16 +251,17 @@
                                 }
                             });
 
-                            // Check if any EVENT_216 has DIFFERENT date than all EVENT_103
-                            const has216DiffDate = tRows.some(r => {
+                            // Check if AT LEAST ONE EVENT_216 has the SAME date as any EVENT_103
+                            const any216SameDate = tRows.some(r => {
                                 if (String(r[eventIdx] || '').trim().toUpperCase() === 'EVENT_216') {
                                     const date216 = normalizeDate(r[dateIdx]);
-                                    return !dates103.includes(date216);
+                                    return dates103.includes(date216);
                                 }
                                 return false;
                             });
 
-                            if (has216DiffDate) {
+                            // Remove only if NO EVENT_216 matches any EVENT_103 date
+                            if (!any216SameDate) {
                                 removed = true;
                                 appliedRule = 3;
                             }
@@ -311,12 +317,12 @@
 
         function createSummarySheet() {
             const summaryData = [
-                ['Oblt Cleaner - Resumo'],
+                ['Oblt Cleaner v1.6 - Resumo'],
                 [''],
-                ['Regra', 'Descricao'],
-                ['Regra 1', 'Trackings com EVENT_103 sem EVENT_216'],
-                ['Regra 2', 'Trackings com EVENT_201 em data diferente do EVENT_103'],
-                ['Regra 3', 'Trackings com EVENT_216 em data diferente do EVENT_103'],
+                ['Regra', 'Descricao', 'Logica'],
+                ['Regra 1', 'Trackings com EVENT_103 sem EVENT_216', 'Remove se nao tem nenhum EVENT_216'],
+                ['Regra 2', 'Trackings com EVENT_201 em data diferente do EVENT_103', 'Remove se NENHUM 201 coincide com qualquer data de 103'],
+                ['Regra 3', 'Trackings com EVENT_216 em data diferente do EVENT_103', 'Remove se NENHUM 216 coincide com qualquer data de 103'],
                 [''],
                 ['Metrica', 'Valor'],
                 ['Total trackings', document.getElementById('totalTrackings').textContent],
